@@ -21,6 +21,13 @@
 #ifndef _WINNT_
 #define _WINNT_
 
+/* bylaws llvm-mingw arm64ec-clang defines __arm64ec__ but not _M_ARM64EC.
+ * Wine's headers use the MSVC-style _M_ARM64EC predefine for ARM64EC guards,
+ * so map it here to keep arm64ec inline asm off the x86 code paths. */
+#if defined(__arm64ec__) && !defined(_M_ARM64EC)
+#define _M_ARM64EC 1
+#endif
+
 #include <basetsd.h>
 #include <guiddef.h>
 #include <winapifamily.h>
@@ -7444,7 +7451,7 @@ static FORCEINLINE void * WINAPI InterlockedExchangePointer( void *volatile *des
     void *ret;
 #if (__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 7))
     ret = __atomic_exchange_n( dest, val, __ATOMIC_SEQ_CST );
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) && !defined(_M_ARM64EC)
     __asm__ __volatile__( "lock; xchgq %0,(%1)" : "=r" (ret) :"r" (dest), "0" (val) : "memory" );
 #elif defined(__i386__)
     __asm__ __volatile__( "lock; xchgl %0,(%1)" : "=r" (ret) :"r" (dest), "0" (val) : "memory" );
