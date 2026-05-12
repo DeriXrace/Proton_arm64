@@ -75,6 +75,20 @@ if [[ ! -x "$WINE_SRC/configure" ]]; then
     ( cd "$WINE_SRC" && ( [[ -x ./autogen.sh ]] && ./autogen.sh || autoreconf -fi ) )
 fi
 
+# include/wine/vulkan.h, wgl.h и пр. помечены в .gitattributes как "generated" —
+# при git clone они могут отсутствовать, а configure/makedep падают без них:
+#   error: open wine/vulkan.h : No such file or directory
+# Регенерируем их из xml-источников ДО configure.
+if [[ ! -f "$WINE_SRC/include/wine/vulkan.h" ]]; then
+    if [[ -x "$WINE_SRC/dlls/winevulkan/make_vulkan" ]] || [[ -f "$WINE_SRC/dlls/winevulkan/make_vulkan" ]]; then
+        log "Генерирую include/wine/vulkan.h (python3 ./make_vulkan)..."
+        ( cd "$WINE_SRC/dlls/winevulkan" && python3 ./make_vulkan ) \
+            || warn "make_vulkan упал — возможно не хватает python3 или интернета для vk.xml."
+    else
+        warn "Нет include/wine/vulkan.h и нет dlls/winevulkan/make_vulkan — configure упадёт."
+    fi
+fi
+
 pushd "$BUILD_DIR" >/dev/null
 
 log "Запускаю configure..."
