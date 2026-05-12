@@ -120,13 +120,23 @@ if [[ ! -f "$WINE_SRC/dlls/ntdll/ntsyscalls.h" || ! -f "$WINE_SRC/dlls/win32u/wi
     fi
 fi
 
-# 3c. server_protocol.h — НЕ перегенерируем.
-#     В Valve proton_11.0 этот файл УЖЕ в git с кастомными расширениями
-#     (fsync, query_directory_file, и др.). tools/make_requests генерит
-#     только upstream-версию без Valve-патчей → ломает сборку.
-#     Если файл отсутствует — это критическая ошибка (git clone битый).
-if [[ ! -f "$WINE_SRC/include/wine/server_protocol.h" ]]; then
-    die "include/wine/server_protocol.h отсутствует! Этот файл должен быть в git. Проверь: git checkout -- include/wine/server_protocol.h"
+# 3c. server_protocol.h + request_handlers.h + request_trace.h
+#     tools/make_requests читает server/protocol.def (который в proton_11.0
+#     содержит Valve-расширения: fsync, query_directory_file, и т.д.) и
+#     генерирует корректный server_protocol.h СО ВСЕМИ расширениями.
+#     git-версия файла может быть upstream-only и не содержать Valve-патчи —
+#     поэтому ВСЕГДА перегенерируем.
+if [[ -f "$WINE_SRC/tools/make_requests" && -f "$WINE_SRC/server/protocol.def" ]]; then
+    log "Генерирую server_protocol.h (perl tools/make_requests из server/protocol.def)..."
+    ( cd "$WINE_SRC" && perl ./tools/make_requests ) \
+        || warn "make_requests упал — проверь perl."
+    # Верификация: proton_11.0 protocol.def содержит fsync, query_directory_file.
+    if ! grep -q 'query_directory_file\|fsync_type' "$WINE_SRC/include/wine/server_protocol.h" 2>/dev/null; then
+        warn "server_protocol.h сгенерирован, но НЕ содержит proton-расширений (fsync/query_directory_file). Сборка может упасть."
+    fi
+else
+    [[ -f "$WINE_SRC/include/wine/server_protocol.h" ]] \
+        || die "include/wine/server_protocol.h нет и нет tools/make_requests — нечем генерить."
 fi
 
 # 3d. opengl: wgl.h + opengl32 thunks — через dlls/opengl32/make_opengl.
