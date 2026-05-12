@@ -75,17 +75,81 @@ if [[ ! -x "$WINE_SRC/configure" ]]; then
     ( cd "$WINE_SRC" && ( [[ -x ./autogen.sh ]] && ./autogen.sh || autoreconf -fi ) )
 fi
 
-# include/wine/vulkan.h, wgl.h и пр. помечены в .gitattributes как "generated" —
-# при git clone они могут отсутствовать, а configure/makedep падают без них:
+# include/wine/vulkan.h, wgl.h, ntsyscalls.h, win32syscalls.h, server_protocol.h
+# и пр. помечены в .gitattributes как "generated" — при git clone они могут
+# отсутствовать, а configure/makedep падают без них:
 #   error: open wine/vulkan.h : No such file or directory
-# Регенерируем их из xml-источников ДО configure.
+#   error: ntsyscalls.h: No such file or directory
+# Регенерируем всё нужное из xml/def/perl источников ДО configure.
+
+# 3a. vulkan.h (+ vulkan thunks) из dlls/winevulkan/make_vulkan (python3 + vk.xml)
 if [[ ! -f "$WINE_SRC/include/wine/vulkan.h" ]]; then
-    if [[ -x "$WINE_SRC/dlls/winevulkan/make_vulkan" ]] || [[ -f "$WINE_SRC/dlls/winevulkan/make_vulkan" ]]; then
+    if [[ -f "$WINE_SRC/dlls/winevulkan/make_vulkan" ]]; then
         log "Генерирую include/wine/vulkan.h (python3 ./make_vulkan)..."
         ( cd "$WINE_SRC/dlls/winevulkan" && python3 ./make_vulkan ) \
-            || warn "make_vulkan упал — возможно не хватает python3 или интернета для vk.xml."
+            || warn "make_vulkan упал — проверь python3 и интернет."
     else
-        warn "Нет include/wine/vulkan.h и нет dlls/winevulkan/make_vulkan — configure упадёт."
+        warn "Нет include/wine/vulkan.h и нет dlls/winevulkan/make_vulkan."
+    fi
+fi
+
+# 3b. ntsyscalls.h + win32syscalls.h из tools/make_specfiles (perl)
+if [[ ! -f "$WINE_SRC/dlls/ntdll/ntsyscalls.h" || ! -f "$WINE_SRC/dlls/win32u/win32syscalls.h" ]]; then
+    if [[ -f "$WINE_SRC/tools/make_specfiles" ]]; then
+        log "Генерирую ntsyscalls.h, win32syscalls.h (perl tools/make_specfiles)..."
+        ( cd "$WINE_SRC" && perl ./tools/make_specfiles ) \
+            || warn "make_specfiles упал — проверь perl."
+    else
+        warn "Нет tools/make_specfiles."
+    fi
+fi
+
+# 3c. server_protocol.h + request_handlers.h + request_trace.h из tools/make_requests
+if [[ ! -f "$WINE_SRC/include/wine/server_protocol.h" ]]; then
+    if [[ -f "$WINE_SRC/tools/make_requests" ]]; then
+        log "Генерирую server_protocol.h (perl tools/make_requests)..."
+        ( cd "$WINE_SRC" && perl ./tools/make_requests ) \
+            || warn "make_requests упал — проверь perl."
+    else
+        warn "Нет tools/make_requests."
+    fi
+fi
+
+# 3d. opengl: wgl.h и opengl32 thunks — через dlls/opengl32/make_opengl
+if [[ ! -f "$WINE_SRC/include/wine/wgl.h" ]]; then
+    if [[ -f "$WINE_SRC/dlls/opengl32/make_opengl" ]]; then
+        log "Генерирую include/wine/wgl.h (perl ./make_opengl)..."
+        ( cd "$WINE_SRC/dlls/opengl32" && perl ./make_opengl ) \
+            || warn "make_opengl упал — opengl32 может не собраться."
+    fi
+fi
+
+# 3e. opencl thunks — через dlls/opencl/make_opencl
+if [[ ! -f "$WINE_SRC/dlls/opencl/opencl.spec" ]]; then
+    if [[ -f "$WINE_SRC/dlls/opencl/make_opencl" ]]; then
+        log "Генерирую opencl thunks (perl ./make_opencl)..."
+        ( cd "$WINE_SRC/dlls/opencl" && perl ./make_opencl ) \
+            || warn "make_opencl упал."
+    fi
+fi
+
+# 3f. make_unicode требует XML::LibXML + Digest::SHA (perl). Если unicode-файлы
+#     отсутствуют, пробуем сгенерить; если не получится — предупреждаем, но
+#     часть из них может быть в репе, и make подтянет их сам позже.
+if [[ ! -f "$WINE_SRC/dlls/dwrite/bracket.c" ]]; then
+    if [[ -f "$WINE_SRC/tools/make_unicode" ]]; then
+        log "Генерирую unicode-файлы (perl tools/make_unicode)... может потребовать инет."
+        ( cd "$WINE_SRC" && perl ./tools/make_unicode ) \
+            || warn "make_unicode упал — если make потом запросит bracket.c/linebreak.c, придётся ставить XML::LibXML."
+    fi
+fi
+
+# 3g. dsound FIR коэффициенты
+if [[ ! -f "$WINE_SRC/dlls/dsound/fir.h" ]]; then
+    if [[ -f "$WINE_SRC/dlls/dsound/make_fir" ]]; then
+        log "Генерирую dsound/fir.h..."
+        ( cd "$WINE_SRC/dlls/dsound" && ./make_fir 2>/dev/null || python3 ./make_fir ) \
+            || warn "make_fir упал."
     fi
 fi
 

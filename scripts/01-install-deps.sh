@@ -40,6 +40,7 @@ $SUDO apt-get install -y --no-install-recommends \
     flex bison gperf \
     mingw-w64 clang lld llvm \
     pkg-config python3 python3-pip \
+    perl libxml-libxml-perl libdigest-sha-perl \
     libgnutls28-dev libunwind-dev \
     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
     libdbus-1-dev \
