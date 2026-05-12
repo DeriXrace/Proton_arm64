@@ -120,15 +120,13 @@ if [[ ! -f "$WINE_SRC/dlls/ntdll/ntsyscalls.h" || ! -f "$WINE_SRC/dlls/win32u/wi
     fi
 fi
 
-# 3c. server_protocol.h + request_handlers.h + request_trace.h из tools/make_requests
+# 3c. server_protocol.h — НЕ перегенерируем.
+#     В Valve proton_11.0 этот файл УЖЕ в git с кастомными расширениями
+#     (fsync, query_directory_file, и др.). tools/make_requests генерит
+#     только upstream-версию без Valve-патчей → ломает сборку.
+#     Если файл отсутствует — это критическая ошибка (git clone битый).
 if [[ ! -f "$WINE_SRC/include/wine/server_protocol.h" ]]; then
-    if [[ -f "$WINE_SRC/tools/make_requests" ]]; then
-        log "Генерирую server_protocol.h (perl tools/make_requests)..."
-        ( cd "$WINE_SRC" && perl ./tools/make_requests ) \
-            || warn "make_requests упал — проверь perl."
-    else
-        warn "Нет tools/make_requests."
-    fi
+    die "include/wine/server_protocol.h отсутствует! Этот файл должен быть в git. Проверь: git checkout -- include/wine/server_protocol.h"
 fi
 
 # 3d. opengl: wgl.h + opengl32 thunks — через dlls/opengl32/make_opengl.
