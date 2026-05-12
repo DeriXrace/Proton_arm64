@@ -7,7 +7,7 @@ apt-get update -y >/dev/null
 apt-get install -y --no-install-recommends \
     ca-certificates curl wget xz-utils tar file \
     git build-essential autoconf automake libtool \
-    flex bison gperf mingw-w64 clang lld llvm \
+    flex bison gperf mingw-w64 \
     pkg-config python3 perl \
     libgnutls28-dev libunwind-dev \
     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \

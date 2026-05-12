@@ -39,12 +39,29 @@ check_compiler "i386"     "i686-w64-mingw32-clang"
 check_compiler "x86_64"   "x86_64-w64-mingw32-clang"
 
 echo ""
+
+# Check that system clang is absent or is bylaws
+if command -v clang >/dev/null 2>&1; then
+    CLANG_PATH=$(which clang)
+    if echo "$CLANG_PATH" | grep -q "llvm-mingw"; then
+        echo "  OK: clang is bylaws ($CLANG_PATH)"
+    else
+        echo "FAIL: system clang found at $CLANG_PATH"
+        echo "  System clang breaks arm64ec DLL linking (no ucrt sysroot)."
+        echo "  Fix: apt remove clang lld llvm"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "  OK: system clang absent (bylaws wrappers will be used)"
+fi
+
+echo ""
 if [ "$ERRORS" -gt 0 ]; then
-    echo "FATAL: $ERRORS compiler(s) failed. Cannot build Wine ARM64EC."
+    echo "FATAL: $ERRORS check(s) failed. Cannot build Wine ARM64EC."
     echo ""
     echo "Fix: source /opt/llvm-mingw.env (or run 02-setup-toolchain.sh)"
-    echo "  Expected: bylaws/llvm-mingw in /opt/llvm-mingw-*/"
+    echo "  Also: apt remove clang lld llvm (if system clang present)"
     exit 1
 fi
 
-echo "[verify] All 4 cross-compilers OK."
+echo "[verify] All checks PASSED."

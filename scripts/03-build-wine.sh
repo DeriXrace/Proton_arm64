@@ -53,22 +53,39 @@ echo "[build] autoreconf..."
 chmod +x ./autogen.sh 2>/dev/null || true
 ( ./autogen.sh || autoreconf -fi ) 2>&1 | tail -3
 
-# --- 6. configure with EXPLICIT CC overrides ---
-# This is the critical fix: passing arm64ec_CC= explicitly prevents configure
-# from silently dropping arm64ec if it can't find the compiler via AC_CHECK_PROGS.
-echo "[build] configure (with explicit CC overrides for arm64ec)..."
+# --- 6. Verify no system clang will interfere ---
+# System clang supports "-target arm64ec-windows" for .o compilation but CANNOT
+# link DLLs (no ucrt sysroot). Wine's --with-mingw=clang prefers system clang over
+# arm64ec-w64-mingw32-clang wrappers. Solution: system clang must be ABSENT or
+# resolve to bylaws. Use --with-mingw (without =clang) so AC_CHECK_PROGS finds wrappers.
+CLANG_PATH=$(which clang 2>/dev/null || echo "not found")
+if [ "$CLANG_PATH" != "not found" ]; then
+    if echo "$CLANG_PATH" | grep -q "llvm-mingw"; then
+        echo "[build] clang is bylaws: $CLANG_PATH — OK"
+    else
+        echo "FATAL: system clang found at $CLANG_PATH"
+        echo "  System clang compiles arm64ec .o but CANNOT link DLLs (no ucrt sysroot)."
+        echo "  Wine configure will use it and arm64ec-windows/ will be empty."
+        echo "  Fix: apt remove clang lld llvm (bylaws provides its own)"
+        exit 1
+    fi
+fi
+
+# Export CC overrides BEFORE configure
+export arm64ec_CC=arm64ec-w64-mingw32-clang
+export arm64ec_CXX=arm64ec-w64-mingw32-clang++
+export aarch64_CC=aarch64-w64-mingw32-clang
+export aarch64_CXX=aarch64-w64-mingw32-clang++
+export i386_CC=i686-w64-mingw32-clang
+export i386_CXX=i686-w64-mingw32-clang++
+
+echo "[build] configure (--with-mingw, bylaws wrappers as CC)..."
 cd "$BUILD_DIR"
 "$WINE_SRC/configure" \
     --enable-archs=arm64ec,aarch64,i386 \
     --prefix=/usr \
-    --with-mingw=clang \
+    --with-mingw \
     --disable-tests \
-    arm64ec_CC=arm64ec-w64-mingw32-clang \
-    arm64ec_CXX=arm64ec-w64-mingw32-clang++ \
-    aarch64_CC=aarch64-w64-mingw32-clang \
-    aarch64_CXX=aarch64-w64-mingw32-clang++ \
-    i386_CC=i686-w64-mingw32-clang \
-    i386_CXX=i686-w64-mingw32-clang++ \
     2>&1 | tail -10
 
 # --- 7. Verify configure picked up arm64ec ---

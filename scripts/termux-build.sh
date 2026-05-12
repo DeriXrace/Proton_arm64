@@ -104,7 +104,7 @@ if [ "${SKIP_DEPS:-0}" != "1" ]; then
     apt-get install -y --no-install-recommends \
         ca-certificates curl wget xz-utils tar file \
         git build-essential autoconf automake libtool \
-        flex bison gperf mingw-w64 clang lld llvm \
+        flex bison gperf mingw-w64 \
         pkg-config python3 perl \
         libgnutls28-dev libunwind-dev \
         libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
@@ -140,6 +140,17 @@ fi
 
 # === Verify toolchain ===
 cd /work/Proton_arm64
+
+# Remove system clang if present — it breaks arm64ec DLL linking
+if command -v clang >/dev/null 2>&1; then
+    CLANG_CHECK=$(which clang)
+    if ! echo "$CLANG_CHECK" | grep -q "llvm-mingw"; then
+        echo "[proot] Removing system clang/lld/llvm (breaks arm64ec linking)..."
+        apt-get remove -y clang lld llvm 2>/dev/null || true
+        apt-get autoremove -y 2>/dev/null || true
+    fi
+fi
+
 bash ./scripts/00-verify-toolchain.sh
 
 # === Build Wine ===
