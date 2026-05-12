@@ -58,6 +58,13 @@ die()  { printf "${C_ERR}[termux]${C_RST} %s\n" "$*" >&2; exit 1; }
 [ -d /data/data/com.termux ] || die "Это не Termux. Скрипт рассчитан на Termux Android ARM64."
 [ "$(uname -m)" = "aarch64" ] || warn "uname -m = $(uname -m), ожидается aarch64."
 
+# ВАЖНО: уходим в HOME. Если запускать скрипт из /sdcard/... (FUSE),
+# у proot ломается getcwd() и tarball криво распаковывается — получается
+# пустой rootfs без /etc. Все последующие команды работают с абсолютными
+# путями, так что cd в HOME ни на что не повлияет.
+mkdir -p "$HOME"
+cd "$HOME"
+
 # storage access
 if [ ! -r "$SDCARD_DIR" ] && [ ! -L "$HOME/storage" ]; then
     warn "Нет доступа к /sdcard — запускаю termux-setup-storage."
@@ -74,9 +81,20 @@ pkg install -y git rsync proot-distro >/dev/null
 
 # ------------------- 2. proot-distro ubuntu -------------------
 PROOT_ROOTFS="${PREFIX}/var/lib/proot-distro/installed-rootfs/${PROOT_DISTRO}"
-if [ ! -d "$PROOT_ROOTFS" ] || [ -z "$(ls -A "$PROOT_ROOTFS" 2>/dev/null)" ]; then
+
+# Детект битого rootfs: каталог есть, но /etc нет — значит предыдущая
+# установка упала на getcwd() и нужно чистить и ставить заново.
+if [ -d "$PROOT_ROOTFS" ] && [ ! -d "$PROOT_ROOTFS/etc" ]; then
+    warn "Rootfs $PROOT_DISTRO повреждён (нет /etc). Удаляю и ставлю заново."
+    proot-distro remove "$PROOT_DISTRO" 2>/dev/null || true
+    rm -rf "$PROOT_ROOTFS"
+fi
+
+if [ ! -d "$PROOT_ROOTFS/etc" ]; then
     log "Устанавливаю Ubuntu в proot-distro (~500 МБ, качается один раз)..."
-    proot-distro install "$PROOT_DISTRO"
+    # cd $HOME — критично для proot getcwd(); см. sanity block выше.
+    ( cd "$HOME" && proot-distro install "$PROOT_DISTRO" ) \
+        || die "proot-distro install $PROOT_DISTRO упал. Проверь интернет и что не запускал скрипт из /sdcard/..."
 else
     log "Ubuntu proot уже установлен: $PROOT_ROOTFS"
 fi
@@ -156,6 +174,8 @@ log "ЭТО ЗАЙМЁТ МНОГО ВРЕМЕНИ (часы на телефон
 log ""
 
 # Пробрасываем флаги SKIP_* внутрь proot.
+# cd в HOME — тот же фикс getcwd() для proot login.
+cd "$HOME"
 proot-distro login "$PROOT_DISTRO" \
     --bind "$WORK_DIR:/work" \
     --bind "$OUTPUT_SDCARD:/output" \
