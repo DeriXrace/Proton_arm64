@@ -67,7 +67,7 @@ do { ulong32 __t = __builtin_bswap32 ((x));     \
 do { XMEMCPY (&(x), (y), 4);                    \
       (x) = __builtin_bswap32 ((x)); } while(0)
 
-#elif !defined(LTC_NO_BSWAP) && (defined(INTEL_CC) || (defined(__GNUC__) && (defined(__DJGPP__) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__i386__) || defined(__x86_64__))))
+#elif !defined(LTC_NO_BSWAP) && (defined(INTEL_CC) || (defined(__GNUC__) && (defined(__DJGPP__) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__i386__) || defined(__x86_64__)))) && !defined(__arm64ec__)
 
 #define STORE32H(x, y)           \
 asm __volatile__ (               \
@@ -107,7 +107,7 @@ do { XMEMCPY (&(x), (y), 8);                    \
       (x) = __builtin_bswap64 ((x)); } while(0)
 
 /* x86_64 processor */
-#elif !defined(LTC_NO_BSWAP) && (defined(__GNUC__) && defined(__x86_64__))
+#elif !defined(LTC_NO_BSWAP) && (defined(__GNUC__) && defined(__x86_64__)) && !defined(__arm64ec__)
 
 #define STORE64H(x, y)           \
 asm __volatile__ (               \
@@ -251,7 +251,7 @@ do { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48) | \
 #define RORc(x,n) _lrotr(x,n)
 #define ROLc(x,n) _lrotl(x,n)
 
-#elif !defined(__STRICT_ANSI__) && defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__)) && !defined(INTEL_CC) && !defined(LTC_NO_ASM)
+#elif !defined(__STRICT_ANSI__) && defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__)) && !defined(INTEL_CC) && !defined(LTC_NO_ASM) && !defined(__arm64ec__)
 #define LTC_ROx_ASM
 
 static inline ulong32 ROL(ulong32 word, int i)
@@ -353,7 +353,7 @@ static inline ulong32 RORc(ulong32 word, const int i)
 
 
 /* 64-bit Rotates */
-#if !defined(__STRICT_ANSI__) && defined(__GNUC__) && defined(__x86_64__) && !defined(_WIN64) && !defined(LTC_NO_ASM)
+#if !defined(__STRICT_ANSI__) && defined(__GNUC__) && defined(__x86_64__) && !defined(_WIN64) && !defined(LTC_NO_ASM) && !defined(__arm64ec__)
 
 static inline ulong64 ROL64(ulong64 word, int i)
 {
