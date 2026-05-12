@@ -22,6 +22,21 @@ if [[ $EUID -ne 0 ]]; then
     SUDO="sudo"
 fi
 
+# ---------- 0. уже установлен? ----------
+# Если /opt/llvm-mingw.env есть и ссылается на рабочий toolchain — выходим.
+# Пропускается флагом FORCE_REINSTALL=1 или удалением /opt/llvm-mingw.env.
+if [[ "${FORCE_REINSTALL:-0}" != "1" && -f "$ENV_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    if [[ -n "${LLVM_MINGW_PATH:-}" && -x "$LLVM_MINGW_PATH/bin/arm64ec-w64-mingw32-clang" ]]; then
+        log "Toolchain уже установлен: $LLVM_MINGW_PATH — пропускаю скачивание."
+        log "Чтобы переставить: FORCE_REINSTALL=1 $0"
+        exit 0
+    else
+        warn "$ENV_FILE есть, но toolchain невалиден — ставлю заново."
+    fi
+fi
+
 # ---------- 1. выбираем asset ----------
 # ARM64 хост -> ubuntu-24.04-aarch64 сборка toolchain-а (работает на самом ARM64 хосте
 # и собирает PE под aarch64 / arm64ec / i386 / x86_64).
