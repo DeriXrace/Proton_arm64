@@ -82,14 +82,30 @@ fi
 #   error: ntsyscalls.h: No such file or directory
 # Регенерируем всё нужное из xml/def/perl источников ДО configure.
 
-# 3a. vulkan.h (+ vulkan thunks) из dlls/winevulkan/make_vulkan (python3 + vk.xml)
-if [[ ! -f "$WINE_SRC/include/wine/vulkan.h" ]]; then
+# 3a. vulkan.h (+ все vulkan thunks) из dlls/winevulkan/make_vulkan (python3 + vk.xml).
+#     make_vulkan генерит сразу: vulkan.h, loader_thunks.c/h, vulkan_thunks.c/h,
+#     winevulkan.spec, winevulkan.json, vulkan-1.spec. Если хоть одного из них нет —
+#     запускаем. (Один файл мог быть подложен вручную, а остальные — нет.)
+VK_OUTS=(
+    "$WINE_SRC/include/wine/vulkan.h"
+    "$WINE_SRC/dlls/winevulkan/loader_thunks.c"
+    "$WINE_SRC/dlls/winevulkan/loader_thunks.h"
+    "$WINE_SRC/dlls/winevulkan/vulkan_thunks.c"
+    "$WINE_SRC/dlls/winevulkan/vulkan_thunks.h"
+    "$WINE_SRC/dlls/winevulkan/winevulkan.spec"
+    "$WINE_SRC/dlls/vulkan-1/vulkan-1.spec"
+)
+VK_MISSING=0
+for f in "${VK_OUTS[@]}"; do
+    [[ -f "$f" ]] || { VK_MISSING=1; break; }
+done
+if [[ $VK_MISSING -eq 1 ]]; then
     if [[ -f "$WINE_SRC/dlls/winevulkan/make_vulkan" ]]; then
-        log "Генерирую include/wine/vulkan.h (python3 ./make_vulkan)..."
+        log "Генерирую vulkan.h + thunks (python3 ./make_vulkan)..."
         ( cd "$WINE_SRC/dlls/winevulkan" && python3 ./make_vulkan ) \
             || warn "make_vulkan упал — проверь python3 и интернет."
     else
-        warn "Нет include/wine/vulkan.h и нет dlls/winevulkan/make_vulkan."
+        warn "Нет dlls/winevulkan/make_vulkan — configure упадёт."
     fi
 fi
 
@@ -115,22 +131,37 @@ if [[ ! -f "$WINE_SRC/include/wine/server_protocol.h" ]]; then
     fi
 fi
 
-# 3d. opengl: wgl.h и opengl32 thunks — через dlls/opengl32/make_opengl
-if [[ ! -f "$WINE_SRC/include/wine/wgl.h" ]]; then
-    if [[ -f "$WINE_SRC/dlls/opengl32/make_opengl" ]]; then
-        log "Генерирую include/wine/wgl.h (perl ./make_opengl)..."
-        ( cd "$WINE_SRC/dlls/opengl32" && perl ./make_opengl ) \
-            || warn "make_opengl упал — opengl32 может не собраться."
-    fi
+# 3d. opengl: wgl.h + opengl32 thunks — через dlls/opengl32/make_opengl.
+GL_OUTS=(
+    "$WINE_SRC/include/wine/wgl.h"
+    "$WINE_SRC/dlls/opengl32/thunks.c"
+    "$WINE_SRC/dlls/opengl32/unix_thunks.c"
+    "$WINE_SRC/dlls/opengl32/opengl32.spec"
+)
+GL_MISSING=0
+for f in "${GL_OUTS[@]}"; do
+    [[ -f "$f" ]] || { GL_MISSING=1; break; }
+done
+if [[ $GL_MISSING -eq 1 && -f "$WINE_SRC/dlls/opengl32/make_opengl" ]]; then
+    log "Генерирую wgl.h + opengl thunks (perl ./make_opengl)..."
+    ( cd "$WINE_SRC/dlls/opengl32" && perl ./make_opengl ) \
+        || warn "make_opengl упал — opengl32 может не собраться."
 fi
 
 # 3e. opencl thunks — через dlls/opencl/make_opencl
-if [[ ! -f "$WINE_SRC/dlls/opencl/opencl.spec" ]]; then
-    if [[ -f "$WINE_SRC/dlls/opencl/make_opencl" ]]; then
-        log "Генерирую opencl thunks (perl ./make_opencl)..."
-        ( cd "$WINE_SRC/dlls/opencl" && perl ./make_opencl ) \
-            || warn "make_opencl упал."
-    fi
+CL_OUTS=(
+    "$WINE_SRC/dlls/opencl/opencl.spec"
+    "$WINE_SRC/dlls/opencl/pe_thunks.c"
+    "$WINE_SRC/dlls/opencl/unix_thunks.c"
+)
+CL_MISSING=0
+for f in "${CL_OUTS[@]}"; do
+    [[ -f "$f" ]] || { CL_MISSING=1; break; }
+done
+if [[ $CL_MISSING -eq 1 && -f "$WINE_SRC/dlls/opencl/make_opencl" ]]; then
+    log "Генерирую opencl thunks (perl ./make_opencl)..."
+    ( cd "$WINE_SRC/dlls/opencl" && perl ./make_opencl ) \
+        || warn "make_opencl упал."
 fi
 
 # 3f. make_unicode требует XML::LibXML + Digest::SHA (perl). Если unicode-файлы
