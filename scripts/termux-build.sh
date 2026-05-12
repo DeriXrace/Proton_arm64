@@ -75,9 +75,19 @@ fi
 [ -d "$SDCARD_DIR" ] || die "Нет каталога $SDCARD_DIR. Создай его и положи туда репу: git clone -b $REPO_BRANCH $REPO_URL $SDCARD_DIR/$REPO_NAME"
 
 # ------------------- 1. termux packages -------------------
-log "Обновляю/ставлю termux-пакеты (git, rsync, proot-distro)..."
-yes | pkg update -y >/dev/null 2>&1 || true
-pkg install -y git rsync proot-distro >/dev/null
+# SKIP_DEPS=1 пропускает и termux pkg update (он медленный — 100+ репо),
+# и apt-get внутри ubuntu. Полезно при повторных запусках.
+if [ "${SKIP_DEPS:-0}" != "1" ]; then
+    log "Обновляю/ставлю termux-пакеты (git, rsync, proot-distro)..."
+    yes | pkg update -y >/dev/null 2>&1 || true
+    pkg install -y git rsync proot-distro >/dev/null
+else
+    log "SKIP_DEPS=1 — пропускаю pkg update/install в termux."
+    # Но убедиться что нужные пакеты стоят, всё же надо.
+    for p in git rsync proot-distro; do
+        command -v "$p" >/dev/null 2>&1 || pkg install -y "$p" >/dev/null
+    done
+fi
 
 # ------------------- 2. proot-distro ubuntu -------------------
 PROOT_ROOTFS="${PREFIX}/var/lib/proot-distro/installed-rootfs/${PROOT_DISTRO}"
